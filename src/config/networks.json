@@ -1,0 +1,65 @@
+{
+    "ethereum": {
+        "testnet": {
+            "chainId": "0xaa36a7",
+            "displayName": "Ethereum Sepolia Testnet",
+            "tickerName": "Ethereum",
+            "ticker": "ETH",
+            "decimals": 18,
+            "rpcTarget": "https://rpc.ankr.com/eth_sepolia",
+            "blockExplorerUrl": "https://sepolia.etherscan.io",
+            "logo": "https://cryptologos.cc/logos/ethereum-eth-logo.png"
+        },
+        "mainnet": {
+            "chainId": "0x1",
+            "displayName": "Ethereum Mainnet",
+            "tickerName": "Ethereum",
+            "ticker": "ETH",
+            "decimals": 18,
+            "rpcTarget": "https://rpc.ankr.com/eth",
+            "blockExplorerUrl": "https://etherscan.io",
+            "logo": "https://cryptologos.cc/logos/ethereum-eth-logo.png"
+        }
+    },
+    "polygon": {
+        "mainnet": {
+            "chainId": "0x89",
+            "displayName": "Polygon Mainnet",
+            "tickerName": "Polygon",
+            "ticker": "POL",
+            "decimals": 18,
+            "rpcTarget": "https://polygon.meowrpc.com",
+            "blockExplorerUrl": "https://polygonscan.com",
+            "logo": "https://cryptologos.cc/logos/polygon-matic-logo.png"
+        },
+        "testnet": {
+            "chainId": "0x13882",
+            "rpcTarget": "https://rpc.ankr.com/polygon_amoy",
+            "displayName": "Polygon Amoy Testnet",
+            "blockExplorerUrl": "https://amoy.polygonscan.com",
+            "ticker": "POL",
+            "tickerName": "Polygon",
+            "logo": "https://cryptologos.cc/logos/polygon-matic-logo.png"
+        }
+    },
+    "binance": {
+        "mainnet": {
+            "chainId": "0x38",
+            "rpcTarget": "https://rpc.ankr.com/bsc",
+            "displayName": "Binance SmartChain Mainnet",
+            "blockExplorerUrl": "https://bscscan.com/",
+            "ticker": "BNB",
+            "tickerName": "BNB",
+            "logo": "https://cryptologos.cc/logos/bnb-bnb-logo.png"
+        },
+        "testnet": {
+            "chainId": "0x61",
+            "rpcTarget": "https://bsc-testnet-rpc.publicnode.com",
+            "displayName": "Binance SmartChain Testnet",
+            "blockExplorerUrl": "https://testnet.bscscan.com",
+            "ticker": "BNB",
+            "tickerName": "BNB",
+            "logo": "https://cryptologos.cc/logos/bnb-bnb-logo.png"
+        }
+    }
+}
