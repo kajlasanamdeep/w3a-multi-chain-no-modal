@@ -1,227 +1,216 @@
 import { useEffect, useState } from "react";
 import { Web3AuthNoModal } from "@web3auth/no-modal";
-import { CHAIN_NAMESPACES, IProvider, UX_MODE, WALLET_ADAPTERS, WEB3AUTH_NETWORK } from "@web3auth/base";
 import { AuthAdapter } from "@web3auth/auth-adapter";
-import { XrplPrivateKeyProvider } from "@web3auth/xrpl-provider";
-import RPC from "./RPC/xrplRPC";
-import "./App.css";
+import { IProvider, WALLET_ADAPTERS } from "@web3auth/base";
+import { web3AuthConfig, authAdapterConfig } from "./config/web3auth";
+import StellarRPC from "./RPC/stellarRPC";
+import SendModal from "./components/SendModal";
+import Success from "./components/Success";
+import Toast from "./components/Toast";
 
-const clientId = "BPi5PB_UiIZ-cPz1GtV5i1I2iOSOHuimiXBI0e-Oe_u6X3oVAbCiAZOTEBtTXw4tsluTITPqA8zMsfxIKMjiqNQ"; // get from https://dashboard.web3auth.io
 
+
+interface ToastState {
+    show: boolean;
+    message: string;
+    type: "success" | "error" | "warning" | "info";
+}
 function App() {
-  const [web3auth, setWeb3auth] = useState<Web3AuthNoModal | null>(null);
-  const [provider, setProvider] = useState<IProvider | null>(null);
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(false);
+    const [show, setShow] = useState(false);
+    const [toast, setToast] = useState<ToastState>({
+        show: false,
+        message: "",
+        type: "success",
+    });
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [transactionHash, setTransactionHash] = useState<string>("");
+    const [publicKey, setPublicKey] = useState<string>("");
+    const [balance, setBalance] = useState<{ [key: string]: string }>({
+        native: "0"
+    })
+    const [provider, setProvider] = useState<IProvider | null>(null);
+    const [stellarProvider, setStellarProvider] = useState<StellarRPC | null>(null);
+    const [loggedIn, setLoggedIn] = useState<boolean>(false);
+    const [web3auth, setWeb3auth] = useState<Web3AuthNoModal | null>(null);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const chainConfig = {
-          chainNamespace: CHAIN_NAMESPACES.XRPL,
-          chainId: "0x2",
-          rpcTarget: "https://testnet-ripple-node.tor.us",
-          wsTarget: "wss://s.altnet.rippletest.net",
-          ticker: "XRP",
-          tickerName: "XRPL",
-          displayName: "xrpl testnet",
-          blockExplorerUrl: "https://testnet.xrpl.org",
-          logo: "",
+    useEffect(() => {
+        const init = async () => {
+            try {
+                const web3auth = new Web3AuthNoModal(web3AuthConfig);
+                setWeb3auth(web3auth);
+                const authAdapter = new AuthAdapter(authAdapterConfig);
+                web3auth.configureAdapter(authAdapter);
+                await web3auth.init();
+                setProvider(web3auth.provider);
+                setLoggedIn(web3auth.connected);
+            } catch (error) {
+                console.error(error);
+            }
         };
+        init();
+    }, []);
 
-        const privateKeyProvider = new XrplPrivateKeyProvider({
-          config: { chainConfig },
-        });
-
-        const web3auth = new Web3AuthNoModal({
-          clientId,
-          privateKeyProvider,
-          web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_MAINNET,
-        });
-
-        const authAdapter = new AuthAdapter({
-          adapterSettings: {
-            uxMode: UX_MODE.REDIRECT,
-          },
-        });
-        web3auth.configureAdapter(authAdapter);
-        setWeb3auth(web3auth);
-
-        await web3auth.init();
-        setProvider(web3auth.provider);
-        if (web3auth.connected) {
-          setLoggedIn(true);
+    useEffect(() => {
+        if (provider) {
+            getStellarProvider();
         }
-      } catch (error) {
-        console.error(error);
-      }
+    }, [provider]);
+    const getStellarProvider = async (): Promise<StellarRPC | null> => {
+        if (!provider) return null;
+
+        const StellarProvider = new StellarRPC(provider);
+        await StellarProvider.getTestnetFund();
+        const balance = await StellarProvider.getBalance();
+        const publicKey = await StellarProvider.getPublicKey();
+        setPublicKey(publicKey)
+        setBalance(balance);
+        setStellarProvider(StellarProvider)
+        return StellarProvider;
     };
 
-    init();
-  }, []);
-
-  const login = async () => {
-    if (!web3auth) {
-      uiConsole("web3auth not initialized yet");
-      return;
+    const refreshBalance = async () => {
+        try {
+            if (!stellarProvider) throw new Error("Stellar Provider not setup properly !");
+            const balance = await stellarProvider.getBalance();
+            setBalance(balance);
+        } catch (error: any) {
+            setToast({
+                message: error?.message,
+                show: true,
+                type: 'error'
+            })
+        }
     }
-    const web3authProvider = await web3auth.connectTo(WALLET_ADAPTERS.AUTH, {
-      loginProvider: "google",
-    });
-    setProvider(web3authProvider);
-  };
+    const login = async () => {
+        if (!web3auth) return;
+        const web3authProvider = await web3auth.connectTo(WALLET_ADAPTERS.AUTH, {
+            loginProvider: "google",
+        });
+        setProvider(web3authProvider);
+        setLoggedIn(true);
+    };
 
-  const authenticateUser = async () => {
-    if (!web3auth) {
-      uiConsole("web3auth not initialized yet");
-      return;
+    const logout = async () => {
+        if (!web3auth) return;
+        await web3auth.logout();
+        setProvider(null);
+        setLoggedIn(false);
+    };
+
+    const onToastClose = () => {
+        setToast({
+            message: "",
+            show: false,
+            type: 'success'
+        })
     }
-    const idToken = await web3auth.authenticateUser();
-    uiConsole(idToken);
-  };
-
-  const getUserInfo = async () => {
-    if (!web3auth) {
-      uiConsole("web3auth not initialized yet");
-      return;
+    const viewTransaction = () => {
+        return window.open(`https://testnet.stellarchain.io/transactions/${transactionHash}`)
     }
-    const user = await web3auth.getUserInfo();
-    // console.log(user);
-    uiConsole(user);
-  };
 
-  const logout = async () => {
-    if (!web3auth) {
-      uiConsole("web3auth not initialized yet");
-      return;
+    const viewWallet = () => {
+        return window.open(`https://testnet.stellarchain.io/accounts/${publicKey}`);
+    };
+
+    const sendTransaction = async (destination: string, amount: number) => {
+
+        try {
+            if (!stellarProvider) throw new Error("Stellar Provider not setup properly !");
+            const balance = await stellarProvider.getBalance();
+            setBalance(balance);
+            if (+amount >= +balance) {
+                throw new Error("Insufficient Balance for transaction !");
+            }
+
+            const receipt = await stellarProvider.sendTransaction(destination, amount.toString());
+            setTransactionHash(receipt?.hash);
+            setShowSuccess(true);
+        } catch (error: any) {
+            setToast({
+                message: error?.message,
+                show: true,
+                type: 'error'
+            })
+        }
     }
-    await web3auth.logout();
-    setProvider(null);
-    setLoggedIn(false);
-  };
+    return (
+        <div className="md:my-[10px] alert flex flex-col w-full md:w-1/2 mx-auto rounded-lg shadow-md bg-white p-4">
+            <Toast onClose={onToastClose} show={toast.show} message={toast.message} type={toast.type} />
+            <Success show={showSuccess} onHide={() => setShowSuccess(false)} viewTransaction={viewTransaction} />
+            <SendModal sendTransaction={sendTransaction} show={show} onHide={() => setShow(false)} selectedNetwork={"XLM"} />
 
-  const getAccounts = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const userAccount = await rpc.getAccounts();
-    uiConsole("Accpuint info: ", userAccount);
-  };
+            <header className="bg-blue-600 text-white p-4 flex justify-between items-center rounded-lg">
+                <div className="text-lg font-bold">Crypto Wallet</div>
+                {loggedIn && (
+                    <div className="flex items-center space-x-4 border border-white p-2 rounded-lg cursor-pointer" onClick={logout}>
+                        <i className="fas fa-reply"></i>
+                    </div>
+                )}
+            </header>
 
-  const getBalance = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const balance = await rpc.getBalance();
-    uiConsole("Balance", balance);
-  };
-
-  const signMessage = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const result = await rpc.signMessage();
-    uiConsole(result);
-  };
-
-  const signAndSendTransaction = async () => {
-    if (!provider) {
-      uiConsole("provider not initialized yet");
-      return;
-    }
-    const rpc = new RPC(provider);
-    const result = await rpc.signAndSendTransaction();
-    uiConsole(result);
-  };
-
-  function uiConsole(...args: any[]): void {
-    const el = document.querySelector("#console>p");
-    if (el) {
-      el.innerHTML = JSON.stringify(args || {}, null, 2);
-    }
-  }
-
-  const loggedInView = (
-    <>
-      <div className="flex-container">
-        <div>
-          <button onClick={getUserInfo} className="card">
-            Get User Info
-          </button>
+            {!loggedIn ? (
+                <main className="flex-grow p-4">
+                    <section className="bg-white p-6 rounded-lg mb-6">
+                        <div className="flex justify-center items-center">
+                            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg" onClick={login}>
+                                Login with Google
+                            </button>
+                        </div>
+                    </section>
+                </main>
+            ) : (
+                <main className="flex-grow p-4">
+                    <section className="bg-white p-6 rounded-lg mb-6">
+                        <h2 className="text-xl font-bold mb-4">Portfolio</h2>
+                        <div className="space-y-4">
+                            <section className="bg-white p-6 rounded-lg mb-6 shadow-md border-[1px] border-gray-200">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center space-x-4">
+                                        <img
+                                            alt={`stellar logo`}
+                                            className="w-12 h-12"
+                                            src={"https://cryptologos.cc/logos/stellar-xlm-logo.png"}
+                                        />
+                                        <div>
+                                            <h3 className="text-lg font-semibold">Stellar XLM</h3>
+                                            <p className="text-gray-500">XLM</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right break-all w-1/2">
+                                        <p className="text-lg font-semibold">{balance?.native}</p>
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center space-x-4 break-all w-1/2">
+                                        <div>
+                                            <h3 className="text-lg font-semibold">Account Public Key</h3>
+                                            <p className="text-gray-500 cursor-pointer" onClick={viewWallet}>{publicKey}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right break-all w-1/2">
+                                        <button
+                                            className="bg-green-600 text-white px-4 pb-2 m-1 rounded-lg text-2xl"
+                                            onClick={refreshBalance}
+                                        >
+                                            ⟳
+                                        </button>
+                                        <button
+                                            className="bg-blue-600 text-white px-4 py-2 m-1 rounded-lg"
+                                            onClick={() => {
+                                                setShow(true);
+                                            }}
+                                        >
+                                            Send
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+                </main>
+            )}
         </div>
-        <div>
-          <button onClick={authenticateUser} className="card">
-            Get ID Token
-          </button>
-        </div>
-        <div>
-          <button onClick={getAccounts} className="card">
-            Get Accounts
-          </button>
-        </div>
-        <div>
-          <button onClick={getBalance} className="card">
-            Get Balance
-          </button>
-        </div>
-        <div>
-          <button onClick={signAndSendTransaction} className="card">
-            Send Transaction
-          </button>
-        </div>
-        <div>
-          <button onClick={signMessage} className="card">
-            Sign Message
-          </button>
-        </div>
-        <div>
-          <button onClick={logout} className="card">
-            Log Out
-          </button>
-        </div>
-      </div>
-      <div id="console" style={{ whiteSpace: "pre-line" }}>
-        <p style={{ whiteSpace: "pre-line" }}>Logged in Successfully!</p>
-      </div>
-    </>
-  );
-
-  const unloggedInView = (
-    <button onClick={login} className="card">
-      Login
-    </button>
-  );
-
-  return (
-    <div className="container">
-      <h1 className="title">
-        <a target="_blank" href="https://web3auth.io/docs/sdk/pnp/web/no-modal" rel="noreferrer">
-          Web3Auth{" "}
-        </a>
-        & XRPL No-Modal Example
-      </h1>
-
-      <div className="grid">{loggedIn ? loggedInView : unloggedInView}</div>
-
-      <footer className="footer">
-        <a
-          href="https://github.com/Web3Auth/web3auth-pnp-examples/tree/main/web-no-modal-sdk/blockchain-connection-examples/xrpl-no-modal-example"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Source code
-        </a>
-        <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FWeb3Auth%2Fweb3auth-pnp-examples%2Ftree%2Fmain%2Fweb-no-modal-sdk%2Fblockchain-connection-examples%2Fxrpl-no-modal-example&project-name=w3a-xrpl-no-modal&repository-name=w3a-xrpl-no-modal">
-          <img src="https://vercel.com/button" alt="Deploy with Vercel" />
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
 
 export default App;

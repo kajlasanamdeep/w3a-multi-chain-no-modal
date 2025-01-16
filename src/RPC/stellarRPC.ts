@@ -1,72 +1,82 @@
 import type { IProvider } from '@web3auth/base';
-import StellarSdk from "stellar-sdk";
+import * as StellarSdk from "@stellar/stellar-sdk";
 
 export default class StellarRPC {
     private provider: IProvider
+    private server: StellarSdk.Horizon.Server
 
     constructor(provider: IProvider) {
-        this.provider = provider
+        this.provider = provider;
+        this.server = new StellarSdk.Horizon.Server("https://horizon-testnet.stellar.org");
     }
 
-    async getChainId(): Promise<string> {
+    private async getPrivateKey(): Promise<any> {
         try {
-            return "";
+            const privateKey = await this.provider.request({
+                method: 'private_key',
+            })
+
+            return privateKey
         } catch (error) {
             return error as string
         }
     }
 
-    public async getPublicKey(): Promise<any> {
+    private async getKeypair(): Promise<any> {
         try {
-            // Create Stellar keypair
-            const privateKey = await this.getGeneralPrivateKey();
-            const keypair = StellarSdk.Keypair.fromSecret(privateKey);
-
-            return keypair.publicKey();
-        } catch (error) {
-            return error
-        }
-    }
-    public async getKeypair(): Promise<any> {
-        try {
-            // Create Stellar keypair
-            const privateKey = await this.getGeneralPrivateKey();
-            const keypair = StellarSdk.Keypair.fromSecret(privateKey);
-
+            const privateKey = await this.getPrivateKey();
+            const privateKeyBuffer = Buffer.from(privateKey, "hex");
+            const keypair = StellarSdk.Keypair.fromRawEd25519Seed(privateKeyBuffer);
             return keypair;
         } catch (error) {
             return error
         }
     }
-    public async getAccounts(): Promise<any> {
+
+    public async getSecretKey(): Promise<any> {
         try {
-
-            const publicKey = await this.getPublicKey();
-            // Connect to Stellar testnet
-            const server = new StellarSdk.Server("https://horizon-testnet.stellar.org");
-
-            console.log("Public Key:", publicKey);
-
-            // Fetch account details
-            const account = await server.loadAccount(publicKey);
-            return account
+            const keypair = await this.getKeypair();
+            return keypair.secret();
         } catch (error) {
             return error
         }
     }
 
-    async getBalance(): Promise<string> {
+    public async getPublicKey(): Promise<any> {
         try {
-            return ""
+            const keypair = await this.getKeypair();
+            return keypair.publicKey();
         } catch (error) {
-            return error as string
+            return error
         }
     }
 
-    async sendTransaction(destination: string, amount: string): Promise<any> {
+    private async getAccount(): Promise<StellarSdk.Horizon.AccountResponse> {
         try {
-            // Build a transaction (example: sending XLM)
-            const account = await this.getAccounts();
+            const publicKey = await this.getPublicKey();
+            const account = await this.server.loadAccount(publicKey);
+            return account
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    public async getBalance(): Promise<{ [key: string]: string }> {
+        try {
+            return (await this.getAccount()).balances.reduce((curr, next) => {
+                return {
+                    ...curr,
+                    [next.asset_type]: next.balance
+                }
+            }, { native: "0" });
+        } catch (error) {
+            throw error
+        }
+    }
+
+    public async sendTransaction(destination: string, amount: string): Promise<StellarSdk.Horizon.HorizonApi.SubmitTransactionResponse> {
+        try {
+            const account = await this.getAccount();
             const transaction = new StellarSdk.TransactionBuilder(account, {
                 fee: StellarSdk.BASE_FEE,
                 networkPassphrase: StellarSdk.Networks.TESTNET,
@@ -80,44 +90,27 @@ export default class StellarRPC {
                 )
                 .setTimeout(30)
                 .build();
-
             const keypair = await this.getKeypair();
-            // Sign transaction
             transaction.sign(keypair);
-
-            // Submit transaction
-            const server = new StellarSdk.Server("https://horizon-testnet.stellar.org");
-
-            const result = await server.submitTransaction(transaction);
+            const result = await this.server.submitTransaction(transaction);
             console.log("Transaction successful:", result);
             return result;
-
         } catch (error) {
-            return error as string;
+            throw error;
         }
     }
 
-    async getPrivateKey(): Promise<any> {
+    public async getTestnetFund(): Promise<any> {
         try {
-            const privateKey = await this.provider.request({
-                method: 'eth_private_key',
-            })
-
-            return privateKey
-        } catch (error) {
-            return error as string
-        }
-    }
-
-    async getGeneralPrivateKey(): Promise<any> {
-        try {
-            const privateKey = await this.provider.request({
-                method: 'private_key',
-            })
-
-            return privateKey
-        } catch (error) {
-            return error as string
+            const response = await fetch(
+                `https://friendbot.stellar.org?addr=${encodeURIComponent(
+                    await this.getPublicKey(),
+                )}`,
+            );
+            const responseJSON = await response.json();
+            return responseJSON;
+        } catch (e) {
+            console.error("ERROR!", e);
         }
     }
 }

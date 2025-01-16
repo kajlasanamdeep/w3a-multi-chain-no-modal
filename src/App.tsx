@@ -7,9 +7,9 @@ import { web3AuthConfig, authAdapterConfig } from "./config/web3auth";
 import networks from "./config/networks.json";
 import Web3 from "web3";
 import EthereumRPC from "./RPC/ethRPC-web3";
-import SendModal from "./SendModal";
-import Success from "./Success";
-import Toast from "./Toast";
+import SendModal from "./components/SendModal";
+import Success from "./components/Success";
+import Toast from "./components/Toast";
 
 const mode = "testnet";
 
