@@ -2,7 +2,7 @@ import { CHAIN_NAMESPACES, WEB3AUTH_NETWORK, UX_MODE, Web3AuthNoModalOptions } f
 import { AuthAdapterOptions } from "@web3auth/auth-adapter";
 import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
 
-const clientId = "BPi5PB_UiIZ-cPz1GtV5i1I2iOSOHuimiXBI0e-Oe_u6X3oVAbCiAZOTEBtTXw4tsluTITPqA8zMsfxIKMjiqNQ"; // get from https://dashboard.web3auth.io
+const clientId = "BBYNrTqjFJgRlLeQLxtlZ7DC-b5_xR9W3fF8e0ExZLOviNyu4cY3-12GgFnDMnRtaf1L0BeWB-ri4MlkBOFq-oM"; // get from https://dashboard.web3auth.io
 
 const chainConfig = {
     chainNamespace: CHAIN_NAMESPACES.EIP155,
@@ -20,7 +20,7 @@ const privateKeyProvider = new EthereumPrivateKeyProvider({ config: { chainConfi
 export const web3AuthConfig: Web3AuthNoModalOptions = {
     clientId,
   privateKeyProvider,
-  web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_MAINNET,
+  web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
 };
 
 

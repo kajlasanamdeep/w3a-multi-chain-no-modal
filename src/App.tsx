@@ -43,7 +43,7 @@ interface ToastState {
 function App() {
     const [show, setShow] = useState(false);
     const [toast, setToast] = useState<ToastState>({
-        show: true,
+        show: false,
         message: "",
         type: "success",
     });
